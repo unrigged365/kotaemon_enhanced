@@ -1,0 +1,23 @@
+FROM ghcr.io/cinnamon/kotaemon:main-full
+
+# Install nano-graphrag and fix hnswlib compatibility issue
+RUN pip install --no-cache-dir nano-graphrag && \
+    pip uninstall hnswlib chroma-hnswlib -y && \
+    pip install --no-cache-dir chroma-hnswlib
+
+# Pre-download NLTK data with SSL verification disabled
+RUN python -c "import ssl; ssl._create_default_https_context = ssl._create_unverified_context; import nltk; nltk.download('punkt_tab'); nltk.download('punkt')" || true
+
+# Nano-GraphRAG - lightweight knowledge graph approach for document understanding
+# Uses: OpenAI API key (separate from Azure) for entity extraction and relationships
+# Faster than MS GraphRAG, good for quick graph construction
+
+# Gradio server configuration
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
+
+# LLM parameters
+ENV TEMPERATURE=1.0
+
+# SSL/TLS configuration
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0

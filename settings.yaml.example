@@ -2,13 +2,18 @@
 # The parameters in this file will only take effect when the USE_CUSTOMIZED_GRAPHRAG_SETTING is true in .env file.
 # For a comprehensive understanding of GraphRAG parameters, please refer to: https://microsoft.github.io/graphrag/config/json_yaml/.
 
+# ⚠️ IMPORTANT: Replace all placeholder values with your actual credentials:
+# - <YOUR_AZURE_OPENAI_API_KEY> → Your Azure OpenAI API key
+# - <YOUR_AZURE_OPENAI_ENDPOINT> → Your Azure OpenAI service endpoint
+# - <YOUR_AZURE_OPENAI_API_VERSION> → Your API version (e.g., 2024-12-01-preview)
+
 encoding_model: cl100k_base
 skip_workflows: []
 llm:
-  api_key: ${GRAPHRAG_API_KEY}
-  type: openai_chat # or azure_openai_chat
-  api_base: http://127.0.0.1:11434/v1
-  model: qwen2
+  api_key: <YOUR_AZURE_OPENAI_API_KEY>
+  type: azure_openai_chat #openai_chat # or azure_openai_chat
+  api_base: <YOUR_AZURE_OPENAI_ENDPOINT>
+  model: gpt-5-nano
   model_supports_json: true # recommended if this is available for your model.
   # max_tokens: 4000
   request_timeout: 1800.0
@@ -16,13 +21,13 @@ llm:
   # api_version: 2024-02-15-preview
   # organization: <organization_id>
   # deployment_name: <azure_model_deployment_name>
-  # tokens_per_minute: 150_000 # set a leaky bucket throttle
-  # requests_per_minute: 10_000 # set a leaky bucket throttle
-  # max_retries: 10
+  tokens_per_minute: 2000000 # set a leaky bucket throttle
+  requests_per_minute: 3000 # set a leaky bucket throttle
+  max_retries: 10
   # max_retry_wait: 10.0
-  # sleep_on_rate_limit_recommendation: true # whether to sleep when azure suggests wait-times
+  sleep_on_rate_limit_recommendation: true # whether to sleep when azure suggests wait-times
   concurrent_requests: 5 # the number of parallel inflight requests that may be made
-  # temperature: 0 # temperature for sampling
+  temperature: 1 # temperature for sampling
   # top_p: 1 # top-p sampling
   # n: 1 # Number of completions to generate
 
@@ -39,20 +44,20 @@ embeddings:
   # batch_size: 16 # the number of documents to send in a single request
   # batch_max_tokens: 8191 # the maximum number of tokens to send in a single request
   llm:
-    api_base: http://localhost:11434/v1
-    api_key: ${GRAPHRAG_API_KEY}
-    model: nomic-embed-text
-    type: openai_embedding
+    api_base: <YOUR_AZURE_OPENAI_ENDPOINT>
+    api_key: <YOUR_AZURE_OPENAI_API_KEY>
+    model: text-embedding-3-small
+    type: azure_openai_embedding
     # api_base: https://<instance>.openai.azure.com
-    # api_version: 2024-02-15-preview
+    api_version: <YOUR_AZURE_OPENAI_API_VERSION>
     # organization: <organization_id>
-    # deployment_name: <azure_model_deployment_name>
-    # tokens_per_minute: 150_000 # set a leaky bucket throttle
-    # requests_per_minute: 10_000 # set a leaky bucket throttle
-    # max_retries: 10
+    deployment_name: text-embedding-3-small
+    tokens_per_minute: 2000000 # set a leaky bucket throttle
+    requests_per_minute: 15000 # set a leaky bucket throttle
+    max_retries: 10
     # max_retry_wait: 10.0
-    # sleep_on_rate_limit_recommendation: true # whether to sleep when azure suggests wait-times
-    # concurrent_requests: 25 # the number of parallel inflight requests that may be made
+    sleep_on_rate_limit_recommendation: true # whether to sleep when azure suggests wait-times
+    concurrent_requests: 20 # the number of parallel inflight requests that may be made
 
 chunks:
   size: 1200

@@ -1,0 +1,19 @@
+FROM ghcr.io/cinnamon/kotaemon:main-full
+
+# Pre-download NLTK data with SSL verification disabled
+RUN python -c "import ssl; ssl._create_default_https_context = ssl._create_unverified_context; import nltk; nltk.download('punkt_tab'); nltk.download('punkt')" || true
+
+# MS GraphRAG - Microsoft's official knowledge graph implementation
+# Uses: OpenAI API key (separate from Azure) for comprehensive entity extraction, relationships, and community detection
+# More comprehensive than Nano-GraphRAG but slower
+# Can be configured for Azure OpenAI or standard OpenAI via settings.yaml
+
+# Gradio server configuration
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
+
+# LLM parameters
+ENV TEMPERATURE=1.0
+
+# SSL/TLS configuration
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0

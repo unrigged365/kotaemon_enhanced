@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_VLM_ENDPOINT = (
     "{0}openai/deployments/{1}/chat/completions?api-version={2}".format(
         config("AZURE_OPENAI_ENDPOINT", default=""),
-        "gpt-4-vision",
+        config("VLM_DEPLOYMENT", default="gpt-5-mini"),
         config("OPENAI_API_VERSION", default=""),
     )
 )

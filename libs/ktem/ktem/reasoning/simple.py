@@ -443,7 +443,7 @@ class FullQAPipeline(BaseReasoning):
             },
             "use_multimodal": {
                 "name": "Use Multimodal Input",
-                "value": False,
+                "value": True,
                 "component": "checkbox",
             },
             "system_prompt": {

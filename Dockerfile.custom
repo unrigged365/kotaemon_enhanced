@@ -1,0 +1,9 @@
+FROM ghcr.io/cinnamon/kotaemon:main-full
+
+# Install nano-graphrag and fix hnswlib compatibility issue
+RUN pip install --no-cache-dir nano-graphrag && \
+    pip uninstall hnswlib chroma-hnswlib -y && \
+    pip install --no-cache-dir chroma-hnswlib
+
+# Set environment variable to use nano-graphrag
+ENV USE_NANO_GRAPHRAG=true

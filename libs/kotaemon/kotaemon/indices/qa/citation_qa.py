@@ -220,11 +220,13 @@ class AnswerWithContextPipeline(BaseComponent):
 
         # execute function call in thread
         if evidence:
+            print(f"DEBUG: enable_citation={self.enable_citation}, enable_mindmap={self.enable_mindmap}")
             if self.enable_citation:
                 citation_thread = threading.Thread(target=citation_call)
                 citation_thread.start()
 
             if self.enable_mindmap:
+                print("DEBUG: Starting mindmap generation thread")
                 mindmap_thread = threading.Thread(target=mindmap_call)
                 mindmap_thread.start()
 
