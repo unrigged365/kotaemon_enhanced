@@ -204,9 +204,7 @@ class ReactAgent(BaseAgent):
         for step_count in range(1, max_iterations + 1):
             prompt = self._compose_prompt(instruction)
             logging.info(f"Prompt: {prompt}")
-            response = self.llm(
-                prompt, stop=["Observation:"]
-            )  # could cause bugs if llm doesn't have `stop` as a parameter
+            response = self.llm(prompt)
             response_text = response.text
             logging.info(f"Response: {response_text}")
             action_step = self._parse_output(response_text)
@@ -275,9 +273,7 @@ class ReactAgent(BaseAgent):
             prompt = self._compose_prompt(instruction)
             logging.info(f"Prompt: {prompt}")
             print(f"Prompt: {prompt}")
-            response = self.llm(
-                prompt, stop=["Observation:"]
-            )  # TODO: could cause bugs if llm doesn't have `stop` as a parameter
+            response = self.llm(prompt)
             response_text = response.text
             logging.info(f"Response: {response_text}")
             print(f"Response: {response_text}")
