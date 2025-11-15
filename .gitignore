@@ -477,3 +477,7 @@ doc_env/
 # application data
 ktem_app_data/
 gradio_tmp/
+
+# Settings and configuration files with secrets
+settings.yaml
+*.Zone.Identifier
