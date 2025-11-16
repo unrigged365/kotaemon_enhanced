@@ -7,6 +7,26 @@ class BaseSplitter(DocTransformer):
     ...
 
 
+# Import LLM-based chunker
+# Note: LLMBasedChunker doesn't explicitly inherit from BaseSplitter to avoid circular imports,
+# but it implements the same interface (run() method) so it works via duck typing
+try:
+    from .llm_chunker import LLMBasedChunker
+except Exception as e:
+    # Log the ACTUAL error so we can see what's wrong
+    import traceback
+    print(f"\n{'!'*80}")
+    print(f"ERROR IMPORTING LLMBasedChunker:")
+    print(f"{'!'*80}")
+    print(f"Error type: {type(e).__name__}")
+    print(f"Error message: {e}")
+    print(f"Full traceback:")
+    traceback.print_exc()
+    print(f"{'!'*80}\n")
+    # LLM chunker may not be available in all environments
+    LLMBasedChunker = None
+
+
 class TokenSplitter(LlamaIndexDocTransformerMixin, BaseSplitter):
     def __init__(
         self,

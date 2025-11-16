@@ -124,6 +124,16 @@ class DirectoryUpload(BasePage):
                     self.reindex = gr.Checkbox(
                         value=False, label="Force reindex file", container=False
                     )
+                    self.use_llm_chunking = gr.Checkbox(
+                        value=False,
+                        label="Use LLM-based semantic chunking",
+                        container=False,
+                    )
+                gr.Markdown(
+                    "**LLM Chunking**: Uses gpt-5-mini for intelligent chunking "
+                    "(slower, ~$0.03/doc, better retrieval) vs token-based (fast, free). "
+                    "Recommended for important documents."
+                )
 
             self.upload_button = gr.Button("Upload and Index")
 
@@ -312,6 +322,16 @@ class FileIndexPage(BasePage):
                             self.reindex = gr.Checkbox(
                                 value=False, label="Force reindex file", container=False
                             )
+                            self.use_llm_chunking = gr.Checkbox(
+                                value=False,
+                                label="Use LLM-based semantic chunking",
+                                container=False,
+                            )
+                        gr.Markdown(
+                            "**LLM Chunking**: Uses gpt-5-mini for intelligent chunking "
+                            "(slower, ~$0.03/doc, better retrieval) vs token-based (fast, free). "
+                            "Recommended for important documents."
+                        )
 
                     self.upload_button = gr.Button(
                         "Upload and Index", variant="primary"
@@ -472,7 +492,8 @@ class FileIndexPage(BasePage):
 
         if vs_ids:
             self._index._vs.delete(vs_ids)
-        self._index._docstore.delete(ds_ids)
+        if ds_ids:
+            self._index._docstore.delete(ds_ids)
 
         gr.Info(f"File {file_name} has been deleted")
 
@@ -871,6 +892,7 @@ class FileIndexPage(BasePage):
                     self.files,
                     self.urls,
                     self.reindex,
+                    self.use_llm_chunking,
                     self._app.settings_state,
                     self._app.user_id,
                 ],
@@ -1090,7 +1112,7 @@ class FileIndexPage(BasePage):
         return remaining_files, errors
 
     def index_fn(
-        self, files, urls, reindex: bool, settings, user_id
+        self, files, urls, reindex: bool, use_llm_chunking: bool, settings, user_id
     ) -> Generator[tuple[str, str], None, None]:
         """Upload and index the files
 
@@ -1098,8 +1120,9 @@ class FileIndexPage(BasePage):
             files: the list of files to be uploaded
             urls: list of web URLs to be indexed
             reindex: whether to reindex the files
-            selected_files: the list of files already selected
+            use_llm_chunking: whether to use LLM-based semantic chunking
             settings: the settings of the app
+            user_id: the user ID
         """
         if urls:
             files = [it.strip() for it in urls.split("\n")]
@@ -1123,6 +1146,25 @@ class FileIndexPage(BasePage):
         gr.Info(f"Start indexing {len(files)} files...")
 
         # get the pipeline
+        # Add use_llm_chunking to settings with proper index prefix
+        print(f"\n{'DEBUG'*20}")
+        print(f"Checkbox value from UI (use_llm_chunking): {use_llm_chunking}")
+        print(f"Settings type: {type(settings)}")
+        print(f"Index ID: {self._index.id}")
+
+        if isinstance(settings, dict):
+            settings = settings.copy()
+        else:
+            settings = {}
+
+        # Add with the proper index prefix (index.options.{id}.use_llm_chunking)
+        settings[f"index.options.{self._index.id}.use_llm_chunking"] = use_llm_chunking
+        # Also add at root level for backward compatibility
+        settings["use_llm_chunking"] = use_llm_chunking
+
+        print(f"After adding with prefix: {settings.get(f'index.options.{self._index.id}.use_llm_chunking')}")
+        print(f"{'DEBUG'*20}\n")
+
         indexing_pipeline = self._index.get_indexing_pipeline(settings, user_id)
 
         outputs, debugs = [], []

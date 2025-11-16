@@ -669,6 +669,7 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
     reader_mode: str = Param("default", help="The reader mode")
     embedding: BaseEmbeddings
     run_embedding_in_thread: bool = False
+    use_llm_chunking: bool = Param(False, help="Use LLM-based semantic chunking")
 
     @Param.auto(depends_on="reader_mode")
     def readers(self):
@@ -703,12 +704,30 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
                 ],
                 "component": "dropdown",
             },
+            "use_llm_chunking": {
+                "name": "Use LLM-based semantic chunking",
+                "value": False,
+                "component": "checkbox",
+                "info": (
+                    "Enable intelligent chunking using LLM (gpt-5-mini) to create "
+                    "semantically coherent chunks with comprehensive metadata. "
+                    "This improves retrieval quality but is slower and costs API tokens. "
+                    "Recommended for important documents."
+                ),
+            },
         }
 
     @classmethod
     def get_pipeline(cls, user_settings, index_settings) -> BaseFileIndexIndexing:
+        print(f"\n{'GET_PIPELINE DEBUG'*15}")
+        print(f"Received user_settings type: {type(user_settings)}")
+        print(f"Received user_settings content: {user_settings}")
+
         use_quick_index_mode = user_settings.get("quick_index_mode", False)
+        use_llm_chunking = user_settings.get("use_llm_chunking", False)
         print("use_quick_index_mode", use_quick_index_mode)
+        print("use_llm_chunking", use_llm_chunking)
+        print(f"{'GET_PIPELINE DEBUG'*15}\n")
         obj = cls(
             embedding=embedding_models_manager[
                 index_settings.get(
@@ -717,6 +736,7 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
             ],
             run_embedding_in_thread=use_quick_index_mode,
             reader_mode=user_settings.get("reader_mode", "default"),
+            use_llm_chunking=use_llm_chunking,
         )
         return obj
 
@@ -751,15 +771,86 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
 
         print(f"Chunk size: {chunk_size}, chunk overlap: {chunk_overlap}")
 
-        print("Using reader", reader)
-        pipeline: IndexPipeline = IndexPipeline(
-            loader=reader,
-            splitter=TokenSplitter(
+        # Decide which splitter to use
+        if self.use_llm_chunking:
+            # Use LLM-based semantic chunking
+            try:
+                from kotaemon.indices.splitters import LLMBasedChunker
+
+                print("\n" + "="*80)
+                print("🤖 INITIALIZING LLM-BASED SEMANTIC CHUNKING")
+                print("="*80)
+                print("Creating LLMBasedChunker instance...")
+
+                # Create chunker with configuration
+                # LLM is lazily initialized from environment variables (Azure OpenAI)
+                splitter = LLMBasedChunker(
+                    nb_questions=5,
+                    max_tokens_per_window=6000,
+                    max_retries=3,
+                    concurrent=True  # Enable parallel window processing
+                )
+
+                print("="*80)
+                print("✅ LLM-BASED SEMANTIC CHUNKING ENABLED")
+                print("="*80)
+                print("Method: LLMBasedChunker with Azure OpenAI (window-based)")
+                print("Configuration:")
+                print("  - Questions per chunk: 5")
+                print("  - Max tokens per window: 6000")
+                print("  - Window processing: Yes (for large documents)")
+                print("  - Parallel processing: Yes (ThreadPoolExecutor - faster!)")
+                print("  - Transition re-chunking: Yes (for semantic boundaries)")
+                print("  - Summary merging: Yes (across windows)")
+                print("Metadata: Simple (chunk_title, chunk_summary, questions, word_count)")
+                print("Processing: Fast semantic chunking with LLM (parallel window extraction)")
+                print("="*80 + "\n")
+                logger.info("LLM-based semantic chunking initialized successfully")
+            except Exception as e:
+                print("\n" + "!"*80)
+                print("❌ FAILED TO INITIALIZE LLM CHUNKER - FALLING BACK TO TOKEN SPLITTER")
+                print("!"*80)
+                print(f"Error type: {type(e).__name__}")
+                print(f"Error message: {e}")
+                print(f"Full error: {e}")
+                import traceback
+                print(f"Traceback: {traceback.format_exc()}")
+                print("!"*80 + "\n")
+                logger.warning(
+                    f"Failed to initialize LLM chunker: {e}. Falling back to TokenSplitter."
+                )
+                splitter = TokenSplitter(
+                    chunk_size=chunk_size or 1024,
+                    chunk_overlap=chunk_overlap or 256,
+                    separator="\n\n",
+                    backup_separators=["\n", ".", "\u200B"],
+                )
+        else:
+            # Use default token-based chunking
+            print("\n" + "="*80)
+            print("📊 TOKEN-BASED CHUNKING (DEFAULT)")
+            print("="*80)
+            print(f"Method: TokenSplitter")
+            print(f"Chunk size: {chunk_size or 1024} tokens")
+            print(f"Chunk overlap: {chunk_overlap or 256} tokens")
+            print("Processing: Fast (~1-2 sec/doc), free")
+            print("Expected benefit: Quick indexing, deterministic chunking")
+            print("="*80 + "\n")
+            logger.info(
+                f"Using token-based chunking: chunk_size={chunk_size or 1024}, "
+                f"chunk_overlap={chunk_overlap or 256}"
+            )
+            splitter = TokenSplitter(
                 chunk_size=chunk_size or 1024,
                 chunk_overlap=chunk_overlap or 256,
                 separator="\n\n",
                 backup_separators=["\n", ".", "\u200B"],
-            ),
+            )
+
+        print("Using reader", reader)
+        pipeline: IndexPipeline = IndexPipeline(
+            loader=reader,
+            splitter=splitter,
             run_embedding_in_thread=self.run_embedding_in_thread,
             Source=self.Source,
             Index=self.Index,
