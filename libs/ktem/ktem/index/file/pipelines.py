@@ -349,6 +349,129 @@ class IndexPipeline(BaseComponent):
             vector_store=self.VS, doc_store=self.DS, embedding=self.embedding
         )
 
+    def handle_docs_batch(
+        self, all_docs, file_ids_list, file_paths_list
+    ) -> Generator[Document, None, None]:
+        """PHASE 2 & 3: Batch chunk all documents and group by file_id
+
+        PHASE 2: Chunk all docs at once (parallel LLM processing)
+        PHASE 3: Group chunks by file_id and index per file
+        """
+        print(f"\n{'=' * 80}")
+        print(f"⏳ PHASE 2: BATCH CHUNKING {len(all_docs)} DOCUMENTS")
+        print(f"{'=' * 80}\n")
+
+        s_time = time.time()
+
+        # PHASE 2: Separate docs by type and chunk all at once
+        text_docs = []
+        non_text_docs = []
+        thumbnail_docs = []
+        doc_to_file_id = {}  # Map doc to its file_id for later grouping
+
+        for doc in all_docs:
+            doc_type = doc.metadata.get("type", "text")
+            file_id = doc.metadata.get("file_id")
+            doc_to_file_id[doc.doc_id] = file_id
+
+            if doc_type == "text":
+                text_docs.append(doc)
+            elif doc_type == "thumbnail":
+                thumbnail_docs.append(doc)
+            else:
+                non_text_docs.append(doc)
+
+        print(f"Separating documents: {len(text_docs)} text, {len(thumbnail_docs)} thumbnails, {len(non_text_docs)} other\n")
+
+        # PHASE 2: Call splitter with ALL text docs (activates parallel processing!)
+        if self.splitter:
+            print(f"Calling splitter with {len(text_docs)} documents (parallel processing)...")
+            all_chunks = self.splitter(text_docs)
+            print(f"✓ Chunking complete: {len(all_chunks)} chunks created\n")
+        else:
+            all_chunks = text_docs
+
+        # Add thumbnails reference
+        page_label_to_thumbnail = {
+            doc.metadata["page_label"]: doc.doc_id for doc in thumbnail_docs
+        }
+        for chunk in all_chunks:
+            page_label = chunk.metadata.get("page_label", None)
+            if page_label and page_label in page_label_to_thumbnail:
+                chunk.metadata["thumbnail_doc_id"] = page_label_to_thumbnail[page_label]
+
+        to_index_chunks = all_chunks + non_text_docs + thumbnail_docs
+
+        # PHASE 3: Group chunks by file_id and index
+        print(f"\n{'=' * 80}")
+        print(f"⏳ PHASE 3: GROUPING AND INDEXING BY FILE_ID")
+        print(f"{'=' * 80}\n")
+
+        # Group chunks by file_id
+        chunks_by_file_id = defaultdict(list)
+        for chunk in to_index_chunks:
+            source_file_id = chunk.metadata.get("file_id")
+            if source_file_id:
+                chunks_by_file_id[source_file_id].append(chunk)
+
+        # Index each file's chunks
+        for file_idx, file_id in enumerate(file_ids_list):
+            if file_id is None:
+                continue
+
+            file_path = file_paths_list[file_idx]
+            if isinstance(file_path, Path):
+                file_name = file_path.name
+            else:
+                file_name = file_path
+
+            file_chunks = chunks_by_file_id.get(file_id, [])
+
+            if not file_chunks:
+                print(f"⚠️  No chunks for file {file_idx + 1}: {file_name}")
+                continue
+
+            print(f"Indexing file {file_idx + 1}/{len(file_ids_list)}: {file_name}")
+            print(f"  - Chunks: {len(file_chunks)}")
+
+            # Add to doc store
+            chunk_size = self.chunk_batch_size * 4
+            n_chunks = 0
+            for start_idx in range(0, len(file_chunks), chunk_size):
+                batch_chunks = file_chunks[start_idx : start_idx + chunk_size]
+                self.handle_chunks_docstore(batch_chunks, file_id)
+                n_chunks += len(batch_chunks)
+
+            print(f"  - Added to doc store: {n_chunks} chunks")
+
+            # Add to vector store
+            def insert_chunks_to_vectorstore(chunks_to_insert, fid):
+                n_chunks_vs = 0
+                chunk_size_vs = self.chunk_batch_size
+                for start_idx in range(0, len(chunks_to_insert), chunk_size_vs):
+                    batch_chunks = chunks_to_insert[start_idx : start_idx + chunk_size_vs]
+                    self.handle_chunks_vectorstore(batch_chunks, fid)
+                    n_chunks_vs += len(batch_chunks)
+                print(f"  - Added to vector store: {n_chunks_vs} chunks")
+
+            if self.run_embedding_in_thread:
+                threading.Thread(
+                    target=lambda c=file_chunks, f=file_id: insert_chunks_to_vectorstore(c, f)
+                ).start()
+            else:
+                insert_chunks_to_vectorstore(file_chunks, file_id)
+
+            yield Document(
+                f"✓ Indexed {file_name}: {len(file_chunks)} chunks",
+                channel="debug",
+            )
+
+        print(f"\n{'=' * 80}")
+        print(f"✅ BATCH PROCESSING COMPLETE")
+        print(f"Total time: {time.time() - s_time:.2f}s")
+        print(f"Total chunks indexed: {len(to_index_chunks)}")
+        print(f"{'=' * 80}\n")
+
     def handle_docs(self, docs, file_id, file_name) -> Generator[Document, None, int]:
         s_time = time.time()
         text_docs = []
@@ -874,15 +997,27 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
     ) -> Generator[
         Document, None, tuple[list[str | None], list[str | None], list[Document]]
     ]:
-        """Return a list of indexed file ids, and a list of errors"""
+        """Return a list of indexed file ids, and a list of errors
+
+        PHASE 1: Load all files and collect documents with file_id metadata
+        PHASE 2: Batch chunk all documents at once (parallel LLM processing)
+        PHASE 3: Group chunks by file_id and index
+        """
         if not isinstance(file_paths, list):
             file_paths = [file_paths]
 
-        file_ids: list[str | None] = []
-        errors: list[str | None] = []
-        all_docs = []
-
         n_files = len(file_paths)
+
+        # PHASE 1: LOAD ALL FILES (without chunking yet)
+        print(f"\n{'=' * 80}")
+        print(f"⏳ PHASE 1: LOADING {n_files} FILE(S)")
+        print(f"{'=' * 80}\n")
+
+        file_paths_list = []  # Track file paths for later reference
+        file_ids_list = []    # Track file_ids for each file
+        all_loaded_docs = []  # Collect all docs from all files
+        file_errors = {}      # Track errors by file
+
         for idx, file_path in enumerate(file_paths):
             if self.is_url(file_path):
                 file_name = file_path
@@ -891,38 +1026,90 @@ class IndexDocumentPipeline(BaseFileIndexIndexing):
                 file_name = file_path.name
 
             yield Document(
-                content=f"Indexing [{idx + 1}/{n_files}]: {file_name}",
+                content=f"Loading [{idx + 1}/{n_files}]: {file_name}",
                 channel="debug",
             )
 
             try:
                 pipeline = self.route(file_path)
-                file_id, docs = yield from pipeline.stream(
-                    file_path, reindex=reindex, **kwargs
-                )
-                all_docs.extend(docs)
-                file_ids.append(file_id)
-                errors.append(None)
-                yield Document(
-                    content={
-                        "file_path": file_path,
-                        "file_name": file_name,
-                        "status": "success",
-                    },
-                    channel="index",
-                )
+
+                # Load file metadata and get file_id (WITHOUT chunking)
+                if isinstance(file_path, Path):
+                    file_path = file_path.resolve()
+
+                file_id = pipeline.get_id_if_exists(file_path)
+
+                # Handle reindexing
+                if isinstance(file_path, Path):
+                    if file_id is not None:
+                        if not reindex:
+                            raise ValueError(
+                                f"File {file_path.name} already indexed. Please rerun with "
+                                "reindex=True to force reindexing."
+                            )
+                        else:
+                            pipeline.delete_file(file_id)
+                            file_id = pipeline.store_file(file_path)
+                    else:
+                        file_id = pipeline.store_file(file_path)
+                else:
+                    if file_id is not None:
+                        raise ValueError(f"URL {file_path} already indexed.")
+                    else:
+                        file_id = pipeline.store_url(file_path)
+
+                # Load file data with file_id in metadata
+                if isinstance(file_path, Path):
+                    extra_info = pipeline.loader._get_file_metadata(str(file_path)) if hasattr(pipeline.loader, '_get_file_metadata') else {"file_name": file_path.name}
+                    file_name_actual = file_path.name
+                else:
+                    extra_info = {"file_name": file_path}
+                    file_name_actual = file_path
+
+                extra_info["file_id"] = file_id
+                extra_info["collection_name"] = pipeline.collection_name
+
+                # Load docs (this is the actual file reading)
+                docs = pipeline.loader.load_data(file_path, extra_info=extra_info)
+
+                # Collect for batch processing
+                all_loaded_docs.extend(docs)
+                file_ids_list.append(file_id)
+                file_paths_list.append(file_path)
+
+                print(f"✓ Loaded [{idx + 1}/{n_files}]: {file_name_actual} ({len(docs)} document(s))")
+
             except Exception as e:
                 logger.exception(e)
-                file_ids.append(None)
-                errors.append(str(e))
-                yield Document(
-                    content={
-                        "file_path": file_path,
-                        "file_name": file_name,
-                        "status": "failed",
-                        "message": str(e),
-                    },
-                    channel="index",
-                )
+                file_errors[idx] = str(e)
+                file_ids_list.append(None)
+                file_paths_list.append(file_path)
+                print(f"✗ Failed [{idx + 1}/{n_files}]: {file_name} - {str(e)}")
 
-        return file_ids, errors, all_docs
+        print(f"\n✓ PHASE 1 COMPLETE: Loaded {len(all_loaded_docs)} documents from {n_files} files\n")
+
+        # PHASE 2 & 3: Use first pipeline for batch chunking and indexing
+        if all_loaded_docs and len(file_paths_list) > 0:
+            pipeline = self.route(file_paths_list[0])
+            yield from pipeline.handle_docs_batch(
+                all_loaded_docs,
+                file_ids_list,
+                file_paths_list
+            )
+
+        # Build final result
+        file_ids: list[str | None] = []
+        errors: list[str | None] = []
+
+        for idx in range(n_files):
+            if idx in file_errors:
+                file_ids.append(None)
+                errors.append(file_errors[idx])
+            elif idx < len(file_ids_list):
+                file_ids.append(file_ids_list[idx])
+                errors.append(None)
+            else:
+                file_ids.append(None)
+                errors.append("Unknown error")
+
+        return file_ids, errors, all_loaded_docs
