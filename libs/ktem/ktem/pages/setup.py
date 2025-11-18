@@ -6,7 +6,6 @@ from decouple import config
 from ktem.app import BasePage
 from ktem.embeddings.manager import embedding_models_manager as embeddings
 from ktem.llms.manager import llms
-from ktem.rerankings.manager import reranking_models_manager as rerankers
 from theflow.settings import settings as flowsettings
 
 KH_OLLAMA_URL = getattr(flowsettings, "KH_OLLAMA_URL", "http://localhost:11434/v1/")
@@ -58,22 +57,21 @@ class SetupPage(BasePage):
         gr.Markdown(f"# Welcome to {self._app.app_name} first setup!")
         self.radio_model = gr.Radio(
             [
-                ("Cohere API (*free registration*) - recommended", "cohere"),
-                ("Google API (*free registration*)", "google"),
                 ("OpenAI API (for GPT-based models)", "openai"),
+                ("Azure OpenAI (Azure deployments)", "azure_openai"),
                 ("Local LLM (for completely *private RAG*)", "ollama"),
             ],
             label="Select your model provider",
-            value="cohere",
+            value="openai",
             info=(
                 "Note: You can change this later. "
-                "If you are not sure, go with the first option "
-                "which fits most normal users."
+                "Select OpenAI for standard API, Azure for enterprise, "
+                "or Ollama for fully local/private setup."
             ),
             interactive=True,
         )
 
-        with gr.Column(visible=False) as self.openai_option:
+        with gr.Column(visible=True) as self.openai_option:
             gr.Markdown(
                 (
                     "#### OpenAI API Key\n\n"
@@ -84,28 +82,26 @@ class SetupPage(BasePage):
                 show_label=False, placeholder="OpenAI API Key"
             )
 
-        with gr.Column(visible=True) as self.cohere_option:
+        with gr.Column(visible=False) as self.azure_openai_option:
             gr.Markdown(
                 (
-                    "#### Cohere API Key\n\n"
-                    "(register your free API key "
-                    "at https://dashboard.cohere.com/api-keys)"
+                    "#### Azure OpenAI Configuration\n\n"
+                    "(get your credentials from Azure Portal)"
                 )
             )
-            self.cohere_api_key = gr.Textbox(
-                show_label=False, placeholder="Cohere API Key"
+            self.azure_api_key = gr.Textbox(
+                label="API Key", show_label=True
             )
-
-        with gr.Column(visible=False) as self.google_option:
-            gr.Markdown(
-                (
-                    "#### Google API Key\n\n"
-                    "(register your free API key "
-                    "at https://aistudio.google.com/app/apikey)"
-                )
+            self.azure_endpoint = gr.Textbox(
+                label="Endpoint URL", show_label=True,
+                placeholder="https://xxxxx.openai.azure.com/"
             )
-            self.google_api_key = gr.Textbox(
-                show_label=False, placeholder="Google API Key"
+            self.azure_deployment = gr.Textbox(
+                label="Deployment Name", show_label=True
+            )
+            self.azure_api_version = gr.Textbox(
+                label="API Version", show_label=True,
+                value="2024-08-01-preview"
             )
 
         with gr.Column(visible=False) as self.ollama_option:
@@ -140,14 +136,16 @@ class SetupPage(BasePage):
         onFirstSetupComplete = gr.on(
             triggers=[
                 self.btn_finish.click,
-                self.cohere_api_key.submit,
                 self.openai_api_key.submit,
+                self.azure_api_key.submit,
             ],
             fn=self.update_model,
             inputs=[
-                self.cohere_api_key,
                 self.openai_api_key,
-                self.google_api_key,
+                self.azure_api_key,
+                self.azure_endpoint,
+                self.azure_deployment,
+                self.azure_api_version,
                 self.ollama_model_name,
                 self.ollama_emb_model_name,
                 self.radio_model,
@@ -179,18 +177,19 @@ class SetupPage(BasePage):
             inputs=[self.radio_model],
             show_progress="hidden",
             outputs=[
-                self.cohere_option,
                 self.openai_option,
+                self.azure_openai_option,
                 self.ollama_option,
-                self.google_option,
             ],
         )
 
     def update_model(
         self,
-        cohere_api_key,
         openai_api_key,
-        google_api_key,
+        azure_api_key,
+        azure_endpoint,
+        azure_deployment,
+        azure_api_version,
         ollama_model_name,
         ollama_emb_model_name,
         radio_model_value,
@@ -201,37 +200,7 @@ class SetupPage(BasePage):
             yield gr.value(visible=False)
             return
 
-        if radio_model_value == "cohere":
-            if cohere_api_key:
-                llms.update(
-                    name="cohere",
-                    spec={
-                        "__type__": "kotaemon.llms.chats.LCCohereChat",
-                        "model_name": "command-r-plus-08-2024",
-                        "api_key": cohere_api_key,
-                    },
-                    default=True,
-                )
-                embeddings.update(
-                    name="cohere",
-                    spec={
-                        "__type__": "kotaemon.embeddings.LCCohereEmbeddings",
-                        "model": "embed-multilingual-v3.0",
-                        "cohere_api_key": cohere_api_key,
-                        "user_agent": "default",
-                    },
-                    default=True,
-                )
-                rerankers.update(
-                    name="cohere",
-                    spec={
-                        "__type__": "kotaemon.rerankings.CohereReranking",
-                        "model_name": "rerank-multilingual-v2.0",
-                        "cohere_api_key": cohere_api_key,
-                    },
-                    default=True,
-                )
-        elif radio_model_value == "openai":
+        if radio_model_value == "openai":
             if openai_api_key:
                 llms.update(
                     name="openai",
@@ -247,7 +216,8 @@ class SetupPage(BasePage):
                 embeddings.update(
                     name="openai",
                     spec={
-                        "__type__": "kotaemon.embeddings.OpenAIEmbeddings",
+                        "__type__": "kotaemon.embeddings"
+                        ".OpenAIEmbeddings",
                         "base_url": "https://api.openai.com/v1",
                         "model": "text-embedding-3-large",
                         "api_key": openai_api_key,
@@ -256,23 +226,30 @@ class SetupPage(BasePage):
                     },
                     default=True,
                 )
-        elif radio_model_value == "google":
-            if google_api_key:
+        elif radio_model_value == "azure_openai":
+            if azure_api_key and azure_endpoint and azure_deployment:
                 llms.update(
-                    name="google",
+                    name="azure_openai",
                     spec={
-                        "__type__": "kotaemon.llms.chats.LCGeminiChat",
-                        "model_name": "gemini-1.5-flash",
-                        "api_key": google_api_key,
+                        "__type__": "kotaemon.llms"
+                        ".AzureChatOpenAI",
+                        "azure_endpoint": azure_endpoint,
+                        "openai_api_key": azure_api_key,
+                        "deployment_name": azure_deployment,
+                        "openai_api_version": azure_api_version,
+                        "temperature": 0.7,
                     },
                     default=True,
                 )
                 embeddings.update(
-                    name="google",
+                    name="azure_openai",
                     spec={
-                        "__type__": "kotaemon.embeddings.LCGoogleEmbeddings",
-                        "model": "models/text-embedding-004",
-                        "google_api_key": google_api_key,
+                        "__type__": "kotaemon.embeddings"
+                        ".AzureOpenAIEmbeddings",
+                        "azure_endpoint": azure_endpoint,
+                        "api_key": azure_api_key,
+                        "deployment": azure_deployment,
+                        "api_version": azure_api_version,
                     },
                     default=True,
                 )
@@ -400,10 +377,11 @@ class SetupPage(BasePage):
         return default_settings
 
     def switch_options_view(self, radio_model_value):
-        components_visible = [gr.update(visible=False) for _ in range(4)]
+        components_visible = [gr.update(visible=False) for _ in range(3)]
 
-        values = ["cohere", "openai", "ollama", "google", None]
-        assert radio_model_value in values, f"Invalid value {radio_model_value}"
+        values = ["openai", "azure_openai", "ollama", None]
+        msg = f"Invalid value {radio_model_value}"
+        assert radio_model_value in values, msg
 
         if radio_model_value is not None:
             idx = values.index(radio_model_value)

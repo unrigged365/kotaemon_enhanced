@@ -56,10 +56,7 @@ class EmbeddingManager:
         from kotaemon.embeddings import (
             AzureOpenAIEmbeddings,
             FastEmbedEmbeddings,
-            LCCohereEmbeddings,
-            LCGoogleEmbeddings,
             LCHuggingFaceEmbeddings,
-            LCMistralEmbeddings,
             OpenAIEmbeddings,
             TeiEndpointEmbeddings,
             VoyageAIEmbeddings,
@@ -69,10 +66,7 @@ class EmbeddingManager:
             AzureOpenAIEmbeddings,
             OpenAIEmbeddings,
             FastEmbedEmbeddings,
-            LCCohereEmbeddings,
             LCHuggingFaceEmbeddings,
-            LCGoogleEmbeddings,
-            LCMistralEmbeddings,
             TeiEndpointEmbeddings,
             VoyageAIEmbeddings,
         ]

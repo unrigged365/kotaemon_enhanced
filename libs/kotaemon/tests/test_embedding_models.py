@@ -8,14 +8,12 @@ from kotaemon.base import Document, DocumentWithEmbedding
 from kotaemon.embeddings import (
     AzureOpenAIEmbeddings,
     FastEmbedEmbeddings,
-    LCCohereEmbeddings,
     LCHuggingFaceEmbeddings,
     OpenAIEmbeddings,
     VoyageAIEmbeddings,
 )
 
 from .conftest import (
-    skip_when_cohere_not_installed,
     skip_when_fastembed_not_installed,
     skip_when_sentence_bert_not_installed,
     skip_when_voyageai_not_installed,
@@ -133,23 +131,6 @@ def test_lchuggingface_embeddings(
     assert_embedding_result(output)
     sentence_transformers_init.assert_called()
     langchain_huggingface_embedding_call.assert_called()
-
-
-@skip_when_cohere_not_installed
-@patch(
-    "langchain_cohere.CohereEmbeddings.embed_documents",
-    side_effect=lambda *args, **kwargs: [[1.0, 2.1, 3.2]],
-)
-def test_lccohere_embeddings(langchain_cohere_embedding_call):
-    model = LCCohereEmbeddings(
-        model="embed-english-light-v2.0",
-        cohere_api_key="my-api-key",
-        user_agent="test",
-    )
-
-    output = model("Hello World")
-    assert_embedding_result(output)
-    langchain_cohere_embedding_call.assert_called()
 
 
 @skip_when_fastembed_not_installed

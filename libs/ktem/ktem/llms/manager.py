@@ -57,9 +57,6 @@ class LLMManager:
         from kotaemon.llms import (
             AzureChatOpenAI,
             ChatOpenAI,
-            LCAnthropicChat,
-            LCCohereChat,
-            LCGeminiChat,
             LCOllamaChat,
             LlamaCppChat,
         )
@@ -67,9 +64,6 @@ class LLMManager:
         self._vendors = [
             ChatOpenAI,
             AzureChatOpenAI,
-            LCAnthropicChat,
-            LCGeminiChat,
-            LCCohereChat,
             LCOllamaChat,
             LlamaCppChat,
         ]

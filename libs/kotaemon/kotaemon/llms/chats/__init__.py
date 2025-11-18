@@ -1,12 +1,9 @@
 from .base import ChatLLM
 from .endpoint_based import EndpointChatLLM
 from .langchain_based import (
-    LCAnthropicChat,
     LCAzureChatOpenAI,
     LCChatMixin,
     LCChatOpenAI,
-    LCCohereChat,
-    LCGeminiChat,
     LCOllamaChat,
 )
 from .llamacpp import LlamaCppChat
@@ -19,9 +16,6 @@ __all__ = [
     "EndpointChatLLM",
     "ChatOpenAI",
     "StructuredOutputChatOpenAI",
-    "LCAnthropicChat",
-    "LCGeminiChat",
-    "LCCohereChat",
     "LCOllamaChat",
     "LCChatOpenAI",
     "LCAzureChatOpenAI",

@@ -148,48 +148,6 @@ class LCAzureOpenAIEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
         return AzureOpenAIEmbeddings
 
 
-class LCCohereEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
-    """Wrapper around Langchain's Cohere embedding, focusing on key parameters"""
-
-    cohere_api_key: str = Param(
-        help="API key (https://dashboard.cohere.com/api-keys)",
-        default=None,
-        required=True,
-    )
-    model: str = Param(
-        help="Model name to use (https://docs.cohere.com/docs/models)",
-        default=None,
-        required=True,
-    )
-    user_agent: str = Param(
-        help="User agent (leave default)", default="default", required=True
-    )
-
-    def __init__(
-        self,
-        model: str = "embed-english-v2.0",
-        cohere_api_key: Optional[str] = None,
-        truncate: Optional[str] = None,
-        request_timeout: Optional[float] = None,
-        **params,
-    ):
-        super().__init__(
-            model=model,
-            cohere_api_key=cohere_api_key,
-            truncate=truncate,
-            request_timeout=request_timeout,
-            **params,
-        )
-
-    def _get_lc_class(self):
-        try:
-            from langchain_cohere import CohereEmbeddings
-        except ImportError:
-            from langchain.embeddings import CohereEmbeddings
-
-        return CohereEmbeddings
-
-
 class LCHuggingFaceEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
     """Wrapper around Langchain's HuggingFace embedding, focusing on key parameters"""
 
@@ -221,73 +179,5 @@ class LCHuggingFaceEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
         return HuggingFaceBgeEmbeddings
 
 
-class LCGoogleEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
-    """Wrapper around Langchain's Google GenAI embedding, focusing on key parameters"""
-
-    google_api_key: str = Param(
-        help="API key (https://aistudio.google.com/app/apikey)",
-        default=None,
-        required=True,
-    )
-    model: str = Param(
-        help="Model name to use (https://ai.google.dev/gemini-api/docs/models/gemini#text-embedding-and-embedding)",  # noqa
-        default="models/text-embedding-004",
-        required=True,
-    )
-
-    def __init__(
-        self,
-        model: str = "models/text-embedding-004",
-        google_api_key: Optional[str] = None,
-        **params,
-    ):
-        super().__init__(
-            model=model,
-            google_api_key=google_api_key,
-            **params,
-        )
-
-    def _get_lc_class(self):
-        try:
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        except ImportError:
-            raise ImportError("Please install langchain-google-genai")
-
-        return GoogleGenerativeAIEmbeddings
 
 
-class LCMistralEmbeddings(LCEmbeddingMixin, BaseEmbeddings):
-    """Wrapper around LangChain's MistralAI embedding, focusing on key parameters"""
-
-    api_key: str = Param(
-        help="API key (https://console.mistral.ai/api-keys)",
-        default=None,
-        required=True,
-    )
-    model: str = Param(
-        help="Model name to use ('mistral-embed')",
-        default="mistral-embed",
-        required=True,
-    )
-
-    def __init__(
-        self,
-        model: str = "mistral-embed",
-        api_key: Optional[str] = None,
-        **params,
-    ):
-        super().__init__(
-            model=model,
-            api_key=api_key,
-            **params,
-        )
-
-    def _get_lc_class(self):
-        try:
-            from langchain_mistralai import MistralAIEmbeddings
-        except ImportError:
-            raise ImportError(
-                "Please install langchain_mistralai: "
-                "`pip install -U langchain_mistralai`"
-            )
-        return MistralAIEmbeddings
