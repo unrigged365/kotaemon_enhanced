@@ -283,6 +283,10 @@ class VectorRetrieval(BaseRetrieval):
         additional_docs = []
 
         for thumbnail_doc in linked_thumbnail_docs:
+            # Safely access the text document - skip if thumbnail ID not found
+            if thumbnail_doc.doc_id not in text_thumbnail_docs:
+                continue
+            
             text_doc = text_thumbnail_docs[thumbnail_doc.doc_id]
             doc_dict = thumbnail_doc.to_dict()
             doc_dict["_id"] = text_doc.doc_id

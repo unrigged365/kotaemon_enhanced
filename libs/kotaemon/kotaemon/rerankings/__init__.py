@@ -1,6 +1,6 @@
 from .base import BaseReranking
 
-from .tei_fast_reranking import TeiFastReranking
-from .voyage_ai_reranking import VoyageAIReranking
+from .tei_fast_rerank import TeiFastReranking
+from .voyageai import VoyageAIReranking
 
 __all__ = ["BaseReranking", "TeiFastReranking", "VoyageAIReranking"]

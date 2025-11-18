@@ -265,7 +265,7 @@ class DocumentRetrievalPipeline(BaseFileIndexRetriever):
             },
             "use_reranking": {
                 "name": "Use reranking",
-                "value": True,
+                "value": False,
                 "choices": [True, False],
                 "component": "checkbox",
             },
@@ -298,16 +298,18 @@ class DocumentRetrievalPipeline(BaseFileIndexRetriever):
             ],
             retrieval_mode=user_settings["retrieval_mode"],
             llm_scorer=(LLMTrulensScoring() if use_llm_reranking else None),
-            rerankers=[
-                reranking_models_manager[
-                    index_settings.get(
-                        "reranking", reranking_models_manager.get_default_name()
-                    )
+            rerankers=(
+                [
+                    reranking_models_manager[
+                        index_settings.get(
+                            "reranking", reranking_models_manager.get_default_name()
+                        )
+                    ]
                 ]
-            ],
+                if user_settings["use_reranking"]
+                else []
+            ),
         )
-        if not user_settings["use_reranking"]:
-            retriever.rerankers = []  # type: ignore
 
         for reranker in retriever.rerankers:
             if isinstance(reranker, LLMReranking):

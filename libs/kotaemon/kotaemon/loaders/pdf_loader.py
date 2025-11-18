@@ -74,11 +74,25 @@ class PDFThumbnailReader(PDFReader):
         """Parse file."""
         documents = super().load_data(file, extra_info, fs)
 
+        # Ensure file_path and file_type are in extra_info
+        if extra_info is None:
+            extra_info = {}
+        if "file_path" not in extra_info:
+            extra_info["file_path"] = str(file)
+        if "file_type" not in extra_info:
+            extra_info["file_type"] = "application/pdf"
+
         page_numbers_str = []
         filtered_docs = []
         is_int_page_number: dict[str, bool] = {}
 
         for doc in documents:
+            # Ensure file_type is set for text documents too
+            if "file_type" not in doc.metadata:
+                doc.metadata["file_type"] = "application/pdf"
+            if "file_path" not in doc.metadata:
+                doc.metadata["file_path"] = str(file)
+                
             if "page_label" in doc.metadata:
                 page_num_str = doc.metadata["page_label"]
                 page_numbers_str.append(page_num_str)

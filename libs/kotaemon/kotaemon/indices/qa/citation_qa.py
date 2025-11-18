@@ -32,7 +32,7 @@ except ImportError:
     raise ImportError("Please install `ktem` to use this component")
 
 MAX_IMAGES = 10
-CITATION_TIMEOUT = 5.0
+CITATION_TIMEOUT = 30.0
 CONTEXT_RELEVANT_WARNING_SCORE = config(
     "CONTEXT_RELEVANT_WARNING_SCORE", 0.3, cast=float
 )
@@ -209,11 +209,27 @@ class AnswerWithContextPipeline(BaseComponent):
 
         def citation_call():
             nonlocal citation
-            citation = self.citation_pipeline(context=evidence, question=question)
+            try:
+                citation = (
+                    self.citation_pipeline(
+                        context=evidence, question=question
+                    )
+                )
+            except Exception as e:
+                print(f"Citation generation failed: {str(e)}")
+                citation = None
 
         def mindmap_call():
             nonlocal mindmap
-            mindmap = self.create_mindmap_pipeline(context=evidence, question=question)
+            try:
+                mindmap = (
+                    self.create_mindmap_pipeline(
+                        context=evidence, question=question
+                    )
+                )
+            except Exception as e:
+                print(f"Mindmap generation failed: {str(e)}")
+                mindmap = None
 
         citation_thread = None
         mindmap_thread = None
@@ -310,7 +326,7 @@ class AnswerWithContextPipeline(BaseComponent):
 
                 for start, end in matches:
                     if "|" not in doc.text[start:end]:
-                        spans[doc.doc_id].append(
+                        spans[str(doc.doc_id)].append(
                             {
                                 "start": start,
                                 "end": end,
@@ -327,7 +343,7 @@ class AnswerWithContextPipeline(BaseComponent):
         has_llm_score = any("llm_trulens_score" in doc.metadata for doc in docs)
 
         spans = self.match_evidence_with_context(answer, docs)
-        id2docs = {doc.doc_id: doc for doc in docs}
+        id2docs = {str(doc.doc_id): doc for doc in docs}
         not_detected = set(id2docs.keys()) - set(spans.keys())
 
         # render highlight spans

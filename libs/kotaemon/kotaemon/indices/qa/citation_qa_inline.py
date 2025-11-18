@@ -214,7 +214,15 @@ class AnswerWithInlineCitation(AnswerWithContextPipeline):
 
         def mindmap_call():
             nonlocal mindmap
-            mindmap = self.create_mindmap_pipeline(context=evidence, question=question)
+            try:
+                mindmap = (
+                    self.create_mindmap_pipeline(
+                        context=evidence, question=question
+                    )
+                )
+            except Exception as e:
+                print(f"Mindmap generation failed: {str(e)}")
+                mindmap = None
 
         mindmap_thread = None
 
@@ -348,7 +356,7 @@ class AnswerWithInlineCitation(AnswerWithContextPipeline):
                 ):
                     best_match = match
                     best_match_length = match_length
-                    best_match_doc_idx = doc.doc_id
+                    best_match_doc_idx = str(doc.doc_id)
 
             if best_match is not None and best_match_doc_idx is not None:
                 spans[best_match_doc_idx].append(

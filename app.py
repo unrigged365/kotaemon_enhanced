@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from theflow.settings import settings as flowsettings
+from ktem.assets import PDFJS_PREBUILT_DIR
 
 KH_APP_DATA_DIR = getattr(flowsettings, "KH_APP_DATA_DIR", ".")
 KH_GRADIO_SHARE = getattr(flowsettings, "KH_GRADIO_SHARE", False)
@@ -26,6 +27,7 @@ demo.queue().launch(
     allowed_paths=[
         "libs/ktem/ktem/assets",
         GRADIO_TEMP_DIR,
+        str(PDFJS_PREBUILT_DIR),
     ],
     share=KH_GRADIO_SHARE,
 )

@@ -12,9 +12,10 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import tiktoken
+import urllib3
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate as LCPromptTemplate
 from langchain_openai import AzureChatOpenAI
@@ -22,9 +23,24 @@ from pydantic import BaseModel
 
 from kotaemon.base import Document
 
-from .llm_prompts import CHUNKING_PROMPT_TEMPLATE, MERGE_SUMMARIES_PROMPT_TEMPLATE
+from .llm_prompts import (
+    CHUNKING_PROMPT_TEMPLATE,
+    MERGE_SUMMARIES_PROMPT_TEMPLATE,
+)
 
 logger = logging.getLogger(__name__)
+
+# Disable SSL warnings for development (comment out or use env var for production)
+try:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
+
+# Set environment variables to disable SSL verification for tiktoken downloads
+# This is for development only and should be avoided in production
+if os.getenv("KOTAEMON_DISABLE_SSL_VERIFY", "").lower() in ("true", "1", "yes"):
+    os.environ["REQUESTS_CA_BUNDLE"] = ""
+    os.environ["CURL_CA_BUNDLE"] = ""
 
 
 class Chunk(BaseModel):

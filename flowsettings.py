@@ -114,7 +114,7 @@ if config("AZURE_OPENAI_API_KEY", default="") and config(
         KH_LLMS["azure"] = {
             "spec": {
                 "__type__": "kotaemon.llms.AzureChatOpenAI",
-                "temperature": 0,
+                "temperature": 1,
                 "azure_endpoint": config("AZURE_OPENAI_ENDPOINT", default=""),
                 "api_key": config("AZURE_OPENAI_API_KEY", default=""),
                 "api_version": config("OPENAI_API_VERSION", default="")
@@ -122,7 +122,7 @@ if config("AZURE_OPENAI_API_KEY", default="") and config(
                 "azure_deployment": config("AZURE_OPENAI_CHAT_DEPLOYMENT", default=""),
                 "timeout": 20,
             },
-            "default": False,
+            "default": True,
         }
     if config("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT", default=""):
         KH_EMBEDDINGS["azure"] = {
@@ -137,7 +137,7 @@ if config("AZURE_OPENAI_API_KEY", default="") and config(
                 ),
                 "timeout": 10,
             },
-            "default": False,
+            "default": True,
         }
 
 OPENAI_DEFAULT = "<YOUR_OPENAI_KEY>"
@@ -229,36 +229,12 @@ if config("LOCAL_MODEL", default=""):
     }
 
 # additional LLM configurations
-KH_LLMS["claude"] = {
-    "spec": {
-        "__type__": "kotaemon.llms.chats.LCAnthropicChat",
-        "model_name": "claude-3-5-sonnet-20240620",
-        "api_key": "your-key",
-    },
-    "default": False,
-}
-KH_LLMS["google"] = {
-    "spec": {
-        "__type__": "kotaemon.llms.chats.LCGeminiChat",
-        "model_name": "gemini-1.5-flash",
-        "api_key": GOOGLE_API_KEY,
-    },
-    "default": not IS_OPENAI_DEFAULT,
-}
 KH_LLMS["groq"] = {
     "spec": {
         "__type__": "kotaemon.llms.ChatOpenAI",
         "base_url": "https://api.groq.com/openai/v1",
         "model": "llama-3.1-8b-instant",
         "api_key": "your-key",
-    },
-    "default": False,
-}
-KH_LLMS["cohere"] = {
-    "spec": {
-        "__type__": "kotaemon.llms.chats.LCCohereChat",
-        "model_name": "command-r-plus-08-2024",
-        "api_key": config("COHERE_API_KEY", default="your-key"),
     },
     "default": False,
 }
@@ -273,31 +249,6 @@ KH_LLMS["mistral"] = {
 }
 
 # additional embeddings configurations
-KH_EMBEDDINGS["cohere"] = {
-    "spec": {
-        "__type__": "kotaemon.embeddings.LCCohereEmbeddings",
-        "model": "embed-multilingual-v3.0",
-        "cohere_api_key": config("COHERE_API_KEY", default="your-key"),
-        "user_agent": "default",
-    },
-    "default": False,
-}
-KH_EMBEDDINGS["google"] = {
-    "spec": {
-        "__type__": "kotaemon.embeddings.LCGoogleEmbeddings",
-        "model": "models/text-embedding-004",
-        "google_api_key": GOOGLE_API_KEY,
-    },
-    "default": not IS_OPENAI_DEFAULT,
-}
-KH_EMBEDDINGS["mistral"] = {
-    "spec": {
-        "__type__": "kotaemon.embeddings.LCMistralEmbeddings",
-        "model": "mistral-embed",
-        "api_key": config("MISTRAL_API_KEY", default="your-key"),
-    },
-    "default": False,
-}
 # KH_EMBEDDINGS["huggingface"] = {
 #     "spec": {
 #         "__type__": "kotaemon.embeddings.LCHuggingFaceEmbeddings",
@@ -307,14 +258,9 @@ KH_EMBEDDINGS["mistral"] = {
 # }
 
 # default reranking models
-KH_RERANKINGS["cohere"] = {
-    "spec": {
-        "__type__": "kotaemon.rerankings.CohereReranking",
-        "model_name": "rerank-multilingual-v2.0",
-        "cohere_api_key": config("COHERE_API_KEY", default=""),
-    },
-    "default": True,
-}
+# Note: TeiFastReranking requires a running TEI service endpoint
+# Note: VoyageAIReranking requires a VOYAGE_API_KEY in environment
+# Users can configure reranking through the UI if they have these services
 
 KH_REASONINGS = [
     "ktem.reasoning.simple.FullQAPipeline",
